@@ -1,0 +1,72 @@
+---
+title: "Assignment 4"
+author: "Hamish Ram"
+date: "9 October 2018"
+output: word_document
+---
+
+```{r}
+library('editrules')
+Quality.df = read.table("~/330/A4/quality.data.txt", header = TRUE)
+plot(Quality.df$InpatientDays)
+plot(Quality.df$ERVisits)
+plot(Quality.df$OfficeVisits)
+plot(Quality.df$Narcotics)
+plot(Quality.df$DaysSinceLastERVisit)
+plot(Quality.df$Pain)
+plot(Quality.df$TotalVisits)
+plot(Quality.df$ProviderCount)
+plot(Quality.df$MedicalClaims)
+plot(Quality.df$ClaimLines)
+plot(Quality.df$StartedOnCombination)
+plot(Quality.df$AcuteDrugGapSmall)
+plot(Quality.df$PoorCare)
+Quality.df <- Quality.df[Quality.df$AcuteDrugGapSmall < 30,]
+```
+1a) AcuteDrugGapSmall has one outlier. Since none of the other value's in this observation is an outlier, it is clear that there is a mistake here. Since the variable is continuous, it is hard to tell what the intended value was, hence it is best to remove this observation as it could have an influence on the final model based on an error. Apart from this outlier the data seems normal
+```{r}
+Quality.glm <- glm(PoorCare~., family = 'binomial', data = Quality.df)
+QualityNULL.glm <- glm(PoorCare~1,family = 'binomial', data = Quality.df)
+step(Quality.glm, scope = formula(Quality.glm), direction = "backward")
+step(QualityNULL.glm, scope = formula(Quality.glm), direction = "forward")
+QualityStep.glm <- glm(PoorCare ~ OfficeVisits + Narcotics + DaysSinceLastERVisit + StartedOnCombination + AcuteDrugGapSmall, family = 'binomial', data = Quality.df)
+summary(QualityStep.glm)
+```
+1b) The Backward selection method selects the model "PoorCare ~ OfficeVisits + Narcotics + DaysSinceLastERVisit + StartedOnCombination + AcuteDrugGapSmall" and the Forward selection method selecteda different model, "PoorCare ~ Narcotics + StartedOnCombination + AcuteDrugGapSmall + TotalVisits" The backward selection method produces a model with a lower AIC and a loser residual devience which makes that model more useful for predictions. Hence the model chosen is:
+"PoorCare ~ OfficeVisits + Narcotics + DaysSinceLastERVisit + StartedOnCombination + AcuteDrugGapSmall"
+
+This model shows that there is significant evidence to suggest that the number of office visits, number of prescriptions, whether or not they were started on a combination of drugs and the fraction of the acute drugs that were relled up has a significant positive impact in the model to determine if the patient had poor care. The number of Days since last ER visit also had an impact on the model.
+```{r}
+1 - pchisq(98.72,124)
+R330::HLstat(QualityStep.glm)
+```
+1c) The pchisq test shows no evidence of a lack of fit which shows that the model is good. The HL stat is also above 0.05 which suggests that there are no problems with highly influential points
+```{r}
+library('R330')
+ROC.curve(PoorCare ~ OfficeVisits + Narcotics + DaysSinceLastERVisit + StartedOnCombination + AcuteDrugGapSmall, family = 'binomial', data = Quality.df)
+```
+1d) Yes, the specificity is 1 - False positive rate. The True positive rate (sensitivity) hits 0.8 shortly before the False positive rate reaches 0.25 (To make Specificity below 0.75) so for a small section of samples, both sensitivity and specificity is over 0.75
+```{r}
+cross.val(QualityStep.glm)
+```
+1e) The mean Specificity is 0.9378561 and the mean Sensitivity is 0.4343173 which suggests a low probability of true positives even if there is a low probability of False positives
+```{r}
+library('quantable')
+Westnile.df <- read.table("~/330/A4/westnile.data.txt", header=TRUE)
+plot(Westnile.df$equine)
+plot(Westnile.df$farms)
+plot(Westnile.df$pbr)
+plot(Westnile.df$density)
+Westnile.df2 <- cbind(Westnile.df$equine, Westnile.df$pbr, Westnile.df$density)
+mypairs(Westnile.df2)
+```
+2a) There have been no outliers or mistakes found in this data. There appears to be a large positive correlation between Equine and pbr, not much correlation between any other factors that will be considered. 
+```{r}
+Westnile.glm <- glm(equine~pbr*density, offset = log(farms/1000), family = 'poisson', data = Westnile.df)
+anova(Westnile.glm, test = "Chisq")
+summary(Westnile.glm)
+1 - pchisq(62.007,42)
+```
+2b) All the variables in the model are significant but there is high evidence against the fact that this model is a good fit to determine the WNV in horses. As there is no curvature in the data to adjust for, it is safe to assume that the model merely does not have enough data to have a good fit. 
+
+2c) The model shows that there is significant evidence to suggest that there is a positive relationship between the positive bird rate (pbr) and the equine WPV. This model suggests that there is an increase of 5330 cases of WNV per 1000 farms for every increase in pbr. There was also significant evidence to suggest that this relationship increase as density increase.
